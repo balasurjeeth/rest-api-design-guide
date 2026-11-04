@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="A practical, language-agnostic guide to designing predictable REST APIs.">
+  <title>REST API Design Guide</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="hero">
+    <nav aria-label="Primary">
+      <a class="brand" href="#top">REST API Design Guide</a>
+      <a href="https://github.com/balasurjeeth/rest-api-design-guide">GitHub</a>
+    </nav>
+    <div class="hero-content" id="top">
+      <p class="eyebrow">A language-agnostic reference</p>
+      <h1>APIs that are<br><span>easy to use.</span></h1>
+      <p class="lede">A practical blueprint for resource naming, pagination, filtering, sorting, and errors—built around predictable HTTP semantics.</p>
+      <a class="button" href="#design">Explore the guide <span aria-hidden="true">↓</span></a>
+    </div>
+    <div class="hero-mark" aria-hidden="true">/</div>
+  </header>
+
+  <main id="design">
+    <aside class="toc" aria-label="On this page">
+      <p>IN THIS GUIDE</p>
+      <a href="#conventions">Conventions</a>
+      <a href="#collection">Collection queries</a>
+      <a href="#pagination">Pagination</a>
+      <a href="#errors">Errors</a>
+      <a href="#statuses">Status codes</a>
+    </aside>
+
+    <article>
+      <section class="intro">
+        <p class="eyebrow">The baseline</p>
+        <h2>Make the contract boring.</h2>
+        <p>Consistency beats cleverness. Model URLs around resources, use standard HTTP behavior, and make every collection query explicit and bounded. The examples below use an imaginary <code>articles</code> resource.</p>
+      </section>
+
+      <section id="conventions" class="guide-section">
+        <div class="section-heading"><span>01</span><h2>Naming &amp; resource conventions</h2></div>
+        <div class="columns">
+          <div>
+            <h3>Prefer nouns, plural collections</h3>
+            <p>Use lowercase, kebab-case path segments. Let the HTTP method express the action; avoid verbs in resource paths.</p>
+            <div class="code-card"><pre><code>GET    /v1/articles
+POST   /v1/articles
+GET    /v1/articles/{articleId}
+PATCH  /v1/articles/{articleId}
+DELETE /v1/articles/{articleId}
+
+GET    /v1/articles/{articleId}/comments</code></pre></div>
+          </div>
+          <div class="note">
+            <h3>Keep URLs predictable</h3>
+            <ul>
+              <li>Use stable opaque IDs; never expose database implementation details.</li>
+              <li>Use query parameters for collection views, not path variants.</li>
+              <li>Use <code>PATCH</code> for partial updates and <code>PUT</code> for full replacement.</li>
+              <li>Version only for breaking changes, e.g. <code>/v1</code>.</li>
+              <li>Return JSON with <code>Content-Type: application/json</code>.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section id="collection" class="guide-section">
+        <div class="section-heading"><span>02</span><h2>Filtering &amp; sorting</h2></div>
+        <p>Use documented, allow-listed fields and operators. Reject unsupported fields or malformed values with a clear <code>400</code>; do not silently ignore them.</p>
+        <div class="code-card"><div class="code-label">REQUEST</div><pre><code>GET /v1/articles?status=published&amp;authorId=u_42&amp;createdAt[gte]=2026-01-01&amp;sort=-createdAt,title&amp;page[size]=25</code></pre></div>
+        <div class="rule-grid">
+          <div><strong>Filter</strong><p>Equality uses the field name. Define operator syntax such as <code>[gte]</code>, <code>[lt]</code>, and repeated parameters for multi-value filters.</p></div>
+          <div><strong>Sort</strong><p>Comma-separated fields; prefix with <code>-</code> for descending. Define a stable default order and append a unique ID as a tie-breaker.</p></div>
+          <div><strong>Bound</strong><p>Set a default page size and a hard maximum. Validate and document date formats, enums, and filter combinations.</p></div>
+        </div>
+        <div class="code-card"><div class="code-label">RESPONSE</div><pre><code>{
+  "data": [
+    { "id": "art_123", "title": "Designing reliable APIs", "status": "published" }
+  ],
+  "pagination": {
+    "nextCursor": "eyJjcmVhdGVkQXQiOi...",
+    "hasMore": true
+  }
+}</code></pre></div>
+      </section>
+
+      <section id="pagination" class="guide-section">
+        <div class="section-heading"><span>03</span><h2>Pagination that scales</h2></div>
+        <div class="columns">
+          <div>
+            <h3>Use cursor pagination for changing data</h3>
+            <p>Cursors perform reliably on large collections and avoid many offset-pagination surprises when records are added or removed. Make cursors opaque, stable, and bound to the query; clients should pass them back, not construct them.</p>
+            <div class="code-card"><pre><code>GET /v1/articles?page[size]=25
+GET /v1/articles?page[size]=25&amp;page[after]=eyJjcmVhdGVkQXQiOi...</code></pre></div>
+          </div>
+          <div>
+            <h3>Offset is fine for small, static lists</h3>
+            <p>For simpler use cases, <code>page[number]</code> and <code>page[size]</code> are familiar. Cap the size, define whether numbering starts at zero or one, and explain that concurrent changes can shift results.</p>
+            <div class="code-card"><pre><code>GET /v1/articles?page[number]=2&amp;page[size]=25</code></pre></div>
+          </div>
+        </div>
+        <p class="callout"><strong>Always:</strong> use a deterministic order, return only the metadata clients need, and make the next-page mechanism explicit. Avoid expensive total counts unless clients truly need them.</p>
+      </section>
+
+      <section id="errors" class="guide-section">
+        <div class="section-heading"><span>04</span><h2>Errors clients can act on</h2></div>
+        <p>Use the standard <a href="https://www.rfc-editor.org/rfc/rfc9457">RFC 9457 Problem Details</a> shape (<code>application/problem+json</code>). Keep messages safe and stable; include a request ID for support and structured field errors for validation.</p>
+        <div class="code-card"><div class="code-label">400 BAD REQUEST</div><pre><code>{
+  "type": "https://api.example.com/problems/invalid-query",
+  "title": "Invalid query parameter",
+  "status": 400,
+  "detail": "The requested sort field is not supported.",
+  "instance": "/v1/articles",
+  "requestId": "req_01JABC...",
+  "errors": [
+    { "parameter": "sort", "code": "unsupported_field", "message": "Allowed: createdAt, title." }
+  ]
+}</code></pre></div>
+        <p>Never return stack traces, SQL, tokens, or internal infrastructure details. Use stable machine-readable problem types and codes; clients should not have to parse human-readable text.</p>
+      </section>
+
+      <section id="statuses" class="guide-section">
+        <div class="section-heading"><span>05</span><h2>Choose status codes deliberately</h2></div>
+        <div class="status-list">
+          <div><code>200</code><span>Successful read, update, or action with a response body.</span></div>
+          <div><code>201</code><span>Resource created; include its representation and a <code>Location</code> header.</span></div>
+          <div><code>202</code><span>Accepted for asynchronous processing; provide a way to check progress.</span></div>
+          <div><code>204</code><span>Successful operation with no response body, commonly deletion.</span></div>
+          <div><code>400</code><span>Malformed request, invalid query, or validation failure.</span></div>
+          <div><code>401</code><span>Missing or invalid authentication credentials.</span></div>
+          <div><code>403</code><span>Authenticated caller lacks permission.</span></div>
+          <div><code>404</code><span>Resource does not exist (or is intentionally undisclosed).</span></div>
+          <div><code>409</code><span>Conflict with current resource state, such as a duplicate.</span></div>
+          <div><code>412</code><span>Precondition failed, e.g. an <code>If-Match</code> version check.</span></div>
+          <div><code>429</code><span>Rate limit exceeded; include <code>Retry-After</code> when possible.</span></div>
+          <div><code>500</code><span>Unexpected server failure; return a safe problem response.</span></div>
+          <div><code>503</code><span>Temporarily unavailable; include <code>Retry-After</code> when known.</span></div>
+        </div>
+        <p class="callout">Use <code>201</code> for a successful create and <code>204</code> only when the response truly has no body. Keep status semantics consistent across the API.</p>
+      </section>
+
+      <footer>
+        <p>Design for predictable clients. Document every supported parameter, bound resource use, and evolve contracts deliberately.</p>
+        <a href="https://github.com/balasurjeeth/rest-api-design-guide">View source on GitHub ↗</a>
+      </footer>
+    </article>
+  </main>
+</body>
+</html>
