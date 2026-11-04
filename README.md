@@ -8,7 +8,7 @@ The published guide is available at [https://balasurjeeth.github.io/rest-api-des
 
 ## Deploy
 
-The site is plain static HTML and CSS in `site/`. GitHub Actions publishes it to GitHub Pages whenever changes are pushed to `main` and can also be run manually from the Actions tab. In the repository settings, set **Pages → Build and deployment → Source** to **GitHub Actions**.
+The site is plain static HTML and CSS in `site/`. GitHub Actions publishes it to the `gh-pages` branch whenever changes are pushed to `main` and can also be run manually from the Actions tab. GitHub Pages serves the root of that branch.
 
 ## Contents
 
