@@ -2,6 +2,10 @@
 
 A language-agnostic, practical guide to predictable REST API design, with examples for endpoint naming, pagination, filtering, sorting, and error handling.
 
+## Python example
+
+A runnable FastAPI implementation of the guide's REST conventions is available in [`python-example/`](python-example/README.md). It demonstrates resource-oriented endpoints, bounded pagination, filtering and sorting, validation, and RFC 9457-style problem details. The existing HTML/CSS guide remains in `site/`.
+
 ## View the guide
 
 The published guide is available at [https://balasurjeeth.github.io/rest-api-design-guide/](https://balasurjeeth.github.io/rest-api-design-guide/).
